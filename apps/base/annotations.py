@@ -21,6 +21,7 @@ from django.template import Template
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import shutil
+import requests
 
 #SINGLETONS:
 
@@ -941,6 +942,12 @@ def addNote(payload):
 
                 instantTagReminder(comment, tagged_user)
 
+        payload_for_socket_server = {'comment':comment.body, 'type':'addNote'}
+        headers_for_socket_server = {'Content-Type': 'application/json'}
+        result = requests.post('http://127.0.0.1:4000/socket_server', data=json.dumps(payload_for_socket_server), headers=headers_for_socket_server)
+
+        print result;
+
         return [comment]
 
 def setLocationSection(id_location, id_section):
@@ -1105,6 +1112,8 @@ def editNote(payload):
             break
         retval["body"] = M.Comment.objects.get(location__id=loc_id, parent=None).body
 
+    requests.post('/socket_server', data = {'comment': comment, 'type': 'editNote'})
+
     return retval
 
 def deleteNote(payload):
@@ -1112,6 +1121,7 @@ def deleteNote(payload):
     comment = M.Comment.objects.get(pk=id)
     comment.deleted = True
     comment.save()
+    requests.post('/socket_server', data = {'comment': comment, 'type': 'deleteNote'})
 
 def deleteThread(payload):
     comments = M.Comment.objects.filter(location__id = payload["id_location"])

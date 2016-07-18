@@ -240,6 +240,92 @@ define(function(require) {
       }
     };
 
+    var load_socket = function() {
+      console.log("LOADING SOCKET");
+      var cb_new_comment = function (P2) {
+        console.log("NEW CALLBACK");
+        var m = Pers.store;
+        m.add('comment', P2['comments']);
+        m.add('location', P2['locations']);
+        console.log(P2['comments']);
+        var msg = '';
+        var l, c;
+        for (var i in P2['comments']) {
+          c = m.o.comment[i];
+          l = m.o.location[c.ID_location];
+          if (c.id_author !==  $.concierge.get_component('get_userinfo')().id) {    //do nothing if I'm the author:
+            msg += "<a href='javascript:" + $str + '.concierge.trigger({type: "select_thread", value:"' + l.ID + "\"})'>New comment on page " + l.page + '</a><br/>';
+          }
+        }
+
+        if (msg !== '') {
+          $.I(msg, true);
+        }
+      };
+
+      var cb_no_message = function (P2) {
+        console.log("EDITED CALLBACK");
+        $.concierge.get_component('notes_loader')({ file:id_source }, function (P) {
+          var m = Pers.store;
+          m.add('seen', P['seen']);
+          m.add('comment', P['comments']);
+          m.add('location', P['locations']);
+          m.add('link', P['links']);
+          m.add('threadmark', P['threadmarks']);
+
+          if ('cl' in  Pers.params) { //load comment labels
+            $.concierge.get_component('commentlabels_loader')({ file:id_source }, function (P) {
+              m.add('labelcategory', P['labelcategories']);
+              m.add('commentlabel', P['commentlabels']);
+              m.add('labelcategorycaption', P['labelcategorycaptions']);
+            });
+          }
+        });
+      };
+
+      // A websocket to get new notes and push them as they appear with the overwritten callback
+      console.log("Pers " + Pers.connection_id);
+      console.log("Conf " + Conf.servers.rpc);
+      console.log("LOADING");
+
+      // Parameters for authenticating the socket
+      var id_source = encodeURIComponent(Pers.id_source);
+      var auth_key = encodeURIComponent(Conf.userinfo.guest ? 'guest=1' : 'ckey=' + Conf.userinfo.ckey);
+      console.log(auth_key);
+      console.log(Conf.servers);
+      var rpc_url = encodeURIComponent(Conf.servers.rpc);
+      var connection_id = encodeURIComponent(Pers.connection_id);
+      
+      var query_string = "id_source=" + id_source + "&auth_key=" + auth_key + "&rpc_url=" + rpc_url + "&connection_id=" + connection_id;
+
+      var socket = io.connect("http://127.0.0.1:4000", {
+        query: query_string
+      });
+      console.log("connected");
+
+      socket.on('addNote', function (data) {
+        console.log("adding_note")
+        var _payload = {};
+        _payload["__return"] = {type:"newNotesOnFile", a:{id_source: Pers.id_source}};
+        Pers.call("log_history", _payload, cb_new_comment);
+      });  
+
+      socket.on('editNote', function (data) {
+        var _payload = {};
+        _payload["__return"] = {type:"newNotesOnFile", a:{id_source: Pers.id_source}};
+        Pers.call("log_history", _payload, cb_no_message);
+      });  
+
+      socket.on('deleteNote', function (data) {
+        var _payload = {};
+        _payload["__return"] = {type:"newNotesOnFile", a:{id_source: Pers.id_source}};
+        Pers.call("log_history", _payload, cb_no_message);
+      });  
+    }
+
+    console.log("about to call")
+    load_socket();
+
     $.concierge.setHistoryHelper(function (_payload, cb) {
       _payload['__return'] = { type:'newNotesOnFile', a:{ id_source: Pers.id_source } };
       Pers.call('log_history', _payload, cb);

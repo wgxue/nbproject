@@ -30,6 +30,7 @@ __EXPORTS = [
     "add_folder",
     "advanced_filter",
     "approveNote",
+    "auth_socket_connection",
     "bulk_import_annotations",
     "copy_file",
     "delete_file",
@@ -855,12 +856,26 @@ def promote_location_by_copy(P, req):
         del retval["html5locations"]
     return UR.prepare_response( retval )
 
+def auth_socket_connection(payload, req):
+    uid = UR.getUserId(req)
+    id_source = payload["id_source"]
+    print "HERE"
+    if auth.canReadFile(uid, id_source):
+        print "CAN READ"
+        return UR.prepare_response({})
+    else:
+        return UR.prepare_response({}, 1,  "NOT ALLOWED")
+
 @csrf_exempt
 def other(req):
     print "nb django doesn't have an URLconf for this yet: %s" % req.method
 
 @csrf_exempt
 def run(req):
+    print "RUNNING RPC"
+    #print req
+    #print req.POST
+    #print req.body
     r = HttpResponse()
     r["Access-Control-Allow-Origin"]="*"
     try:
@@ -878,6 +893,9 @@ def run(req):
             MODULE = sys.modules[__name__]
             if  fctname in __EXPORTS:
                 r.content = getattr(MODULE, fctname)(payload, req)
+                print fctname
+                if fctname == 'auth_socket_connection':
+                    print r
                 return r
             else:
                 assert False, "[PDF] method '%s' not found in __EXPORTS" %  fctname
